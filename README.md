@@ -17,36 +17,56 @@ This project consists of a Bash script that walks the user through retrieving a 
 - <b>SRA Toolkit</b>
 - <b>SAMtools</b>
 
-<h2>Program walk-through:</h2>
+<h2>Script:</h2>
 
-<p align="center">
-Launch the utility: <br/>
-<img src="https://i.imgur.com/62TgaWL.png" height="80%" width="80%" alt="Disk Sanitization Steps"/>
-<br />
-<br />
-Select the disk:  <br/>
-<img src="https://i.imgur.com/tcTyMUE.png" height="80%" width="80%" alt="Disk Sanitization Steps"/>
-<br />
-<br />
-Enter the number of passes: <br/>
-<img src="https://i.imgur.com/nCIbXbg.png" height="80%" width="80%" alt="Disk Sanitization Steps"/>
-<br />
-<br />
-Confirm your selection:  <br/>
-<img src="https://i.imgur.com/cdFHBiU.png" height="80%" width="80%" alt="Disk Sanitization Steps"/>
-<br />
-<br />
-Wait for process to complete (may take some time):  <br/>
-<img src="https://i.imgur.com/JL945Ga.png" height="80%" width="80%" alt="Disk Sanitization Steps"/>
-<br />
-<br />
-Sanitization complete:  <br/>
-<img src="https://i.imgur.com/K71yaM2.png" height="80%" width="80%" alt="Disk Sanitization Steps"/>
-<br />
-<br />
-Observe the wiped disk:  <br/>
-<img src="https://i.imgur.com/AeZkvFQ.png" height="80%" width="80%" alt="Disk Sanitization Steps"/>
-</p>
+
+# Stop on error
+set -uex
+
+# Define directory name
+DIR="refs"
+
+# Create a new directory
+mkdir -p "$DIR"
+
+# Define the accession number for the reference genome
+ACC="AF086833"
+
+# Define path to reference genome file
+REF="$DIR/$ACC.fa"
+
+# Get the genome in GenBank format and extract the source only
+bio fetch "$ACC" --format fasta > "$REF"
+
+# Build the index using bwa 
+bwa index "$REF"
+
+# Obtain SRA data and save into new file
+QUERY="PRJNA257197"
+RUNINFO="$DIR/runinfo.csv"
+esearch -db sra -query "$QUERY" | efetch -format runinfo > "$RUNINFO"
+
+# Pick a run from the file
+RUN="SRR1972739"
+
+# Define the number of reads to subset
+NUM_READS="10000"
+
+# Subset the data to 10K reads
+fastq-dump -X "$NUM_READS" --split-files "$RUN" -O "$DIR"
+
+# Perform alignment in paired-end mode
+OUTPUT_SAM="$DIR/output.sam"
+R1="$DIR/${RUN}_1.fastq"
+R2="$DIR/${RUN}_2.fastq"
+bwa mem "$REF" "$R1" "$R2" > "$OUTPUT_SAM"
+
+# Convert SAM to sorted BAM
+OUTPUT_BAM="$DIR/output.bam"
+samtools sort -o "$OUTPUT_BAM" "$OUTPUT_SAM"
+
+# Index the BAM file
+samtools index "$OUTPUT_BAM"
 
 <!--
  ```diff
